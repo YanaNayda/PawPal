@@ -6,7 +6,7 @@ import { Keyboard, TouchableWithoutFeedback , TextInput ,Alert} from 'react-nati
 import { NavigationContainer } from '@react-navigation/native';
 import axios from 'axios';
 import { useUser } from '../../context/UserContext';
- 
+import { SERVER_CONFIG } from '../../config/serverConfig'; 
 
 export default function LogInScreen({ navigation }) {
   const [Email, setTextEmail] = useState('');
@@ -69,7 +69,9 @@ export default function LogInScreen({ navigation }) {
       }
       try {
          
-        const response = await axios.post('http://192.168.1.83:3000/api/v1/auth/login', {
+       const response = await axios.post(
+  `http://${SERVER_CONFIG.SERVER_IP}:${SERVER_CONFIG.SERVER_PORT}/api/v1/auth/login`,
+  {
           email: Email,
           password: Password,
         });

@@ -13,7 +13,12 @@ export default function  CommentsCard({ comment, style, onDeletePress}) {
 
    const handleAuthorPress = () => {
     if (comment.author) {
-      //navigation.navigate('ProfileScreen', { userId: comment.authorId });
+      const authorId = typeof comment.author === 'object' 
+        ? comment.author?.uid 
+        : comment.author;
+      if (authorId) {
+        navigation.navigate('ViewUser', { userId: authorId });
+      }
     }
   };
 
@@ -28,11 +33,14 @@ export default function  CommentsCard({ comment, style, onDeletePress}) {
     return (
     <View style={[styles.commentsCard, style]}>
       <View style={styles.Row}>
-        <Image
-          source={comment.authorPhotoURL ? { uri: comment.authorPhotoURL } : avatarImage}
-          style={styles.profileImage}
-        />
-        <Text style={styles.authorDisplayName}>{comment.authorDisplayName || 'No name'}</Text>
+        
+        <TouchableOpacity onPress={handleAuthorPress}>
+          <Text style={styles.authorDisplayName}>
+            {typeof comment.author === 'object' 
+              ? comment.author?.displayName 
+              : comment.authorDisplayName || 'No name'}
+          </Text>
+        </TouchableOpacity>
 
         {console.log('comment.authorId:', comment.author, 'userData?.uid:', userData?.uid)}
 {comment.author === userData?.uid && (

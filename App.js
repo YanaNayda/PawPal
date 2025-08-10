@@ -21,7 +21,7 @@ import ChatScreen from './screen/additionalScreen/ChatScreen';
 import MessagesChatScreen from './screen/additionalScreen/MessagesChatScreen';
 import CreateChatScreen from './screen/additionalScreen/CreateChatScreen';
 import AddParticipantsScreen from './screen/additionalScreen/AddParticipantsScreen';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import 'react-native-gesture-handler';
@@ -29,8 +29,11 @@ import CustomDrawerContent from './navigation/CustomDrawerContent';
 import { UserProvider } from './context/UserContext';
 import EditProfile from './screen/mainScreen/EditProfile';
  import CreateProduct from './screen/mainScreen/Marketplace/CreateProduct';
+import MyProductScreen from './screen/mainScreen/Marketplace/MyProductScreen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import CreatePost from './screen/mainScreen/CreatePost';
+import SearchScreen from './screen/additionalScreen/SearchScreen';
+import ViewUserScreen from './screen/mainScreen/ViewUserScreen';
 import { Provider as PaperProvider } from 'react-native-paper';
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
@@ -39,18 +42,19 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const Drawer = createDrawerNavigator();
 
-function HeaderChatButton() {
+function HeaderButtons() {
   const navigation = useNavigation();
   return (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('Chat')}
-      style={{ marginRight: 15 }}
-    >
-      <Image
-        source={require('./assets/chat_icon.png')} 
-        style={{ width: 24, height: 24 }}
-      />
-    </TouchableOpacity>
+    <View style={{ flexDirection: 'row', marginRight: 15 }}>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Chat')}
+      >
+        <Image
+          source={require('./assets/chat_icon.png')} 
+          style={{ width: 24, height: 24 }}
+        />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -66,6 +70,8 @@ function HeaderChatButton() {
             iconSource = require('./assets/house_icon.png');
           } else if (route.name === 'Marketplace') {
             iconSource = require('./assets/marketplace_icon.png');
+          } else if (route.name === 'Search') {
+            iconSource = require('./assets/information_icon.png');
           } else if (route.name === 'Profile') {
             iconSource = require('./assets/profile_icon.png');
           }
@@ -81,9 +87,10 @@ function HeaderChatButton() {
         tabBarInactiveTintColor: 'gray',
       })}>
 
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Marketplace" component={MarketplaceScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Marketplace" component={MarketplaceScreen} options={{ tabBarLabel: 'Marketplace' }} />
+      <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: 'Search' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );
 }
@@ -118,7 +125,7 @@ function HeaderChatButton() {
        drawerContent={(props) => <CustomDrawerContent {...props} />} 
       >
 
-        <Drawer.Screen name="PawPal" component={TabNavigation} options={{ title: 'PawPal', headerRight: () => <HeaderChatButton />,}}/>
+        <Drawer.Screen name="PawPal" component={TabNavigation} options={{ title: 'PawPal', headerRight: () => <HeaderButtons />,}}/>
         <Drawer.Screen name="Help&Support" component={HelpSupportScreen} 
         options={{ headerShown: true, title: 'Help&Support' }}/>
         <Drawer.Screen name="Settings" component={SettingsScreen} 
@@ -151,7 +158,9 @@ export default function App() {
           <Stack.Screen name="Saved" component={SavedScreen} options={{ headerShown: true, title: 'Saved' }} />
           <Stack.Screen name="ProductScreen" component={ProductScreen} options={{ headerShown: true, title: 'Product' }} />
           <Stack.Screen name="CreateProduct" component={CreateProduct} options={{ headerShown: true, title: 'Add Product' }} />
+          <Stack.Screen name="MyProduct" component={MyProductScreen} options={{ headerShown: true, title: 'My Products' }} />
           <Stack.Screen name="PostScreen" component={PostScreen} options={{ headerShown: true, title: 'Post' }} />
+          <Stack.Screen name="ViewUser" component={ViewUserScreen} options={{ headerShown: true, title: 'User Profile' }} />
          </Stack.Navigator>
         </NavigationContainer>
       </UserProvider>

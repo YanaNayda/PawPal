@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, Image, TouchableOpacity , Button,TextInput} from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, Image, TouchableOpacity , Button,TextInput, Alert} from 'react-native';
 import * as ImagePicker from 'expo-image-picker'; 
 
 import { useUser } from '../../context/UserContext';
@@ -8,11 +8,13 @@ import MyChips from './components/MyChips';
 import { ScrollView } from 'react-native';
 import axios from 'axios';
  import uuid from 'react-native-uuid';
- 
+ import { SERVER_CONFIG } from  '../../config/serverConfig';
  
 
 const  CreatePost = ({ navigation }) => {
-
+      
+    const [localPhoto, setLocalPhoto] = useState(null);  
+    const [loadingImage, setLoadingImage] = useState(false);
     const [photo, setPhoto] = useState(null);
     const [information, setInformation] = useState("");
     const [choseTags, setChoseTags] = useState([]);
@@ -20,27 +22,72 @@ const  CreatePost = ({ navigation }) => {
     const [selected, setSelected] = useState(null);
   
     //const userPostsCount = userData?_userPostsCount;
-    
- 
+  const uploadImageToCloudinary = async (imageUri) => {
+  const data = new FormData();
+  data.append('file', {
+    uri: imageUri,
+    type: 'image/jpeg',
+    name: 'post.jpg',
+  });
+  data.append('upload_preset', 'pawpal_upload');  
 
+  try {
+    console.log('Sending request to Cloudinary...');
+    const res = await fetch('https://api.cloudinary.com/v1_1/ddktpudii/image/upload', {
+      method: 'POST',
+      body: data,
+    });
+    
+    console.log('Cloudinary response status:', res.status);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.log('Cloudinary error response:', errorText);
+      return null;
+    }
+    
+    const file = await res.json();
+    console.log('Cloudinary upload success:', file.secure_url);
+    return file.secure_url; 
+  } catch (error) {
+    console.log('Cloudinary upload error:', error);
+    return null;
+  }
+   };
+ 
   const pickImage = async () => {
   const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permissionResult.granted) {
     Alert.alert('Permission required', 'Gallery permission is required to select a photo.');
     return;
   }
+
   const result = await ImagePicker.launchImageLibraryAsync({
     allowsEditing: true,
     aspect: [1, 1],
     quality: 1,
   });
+
   if (!result.canceled && result.assets?.length > 0) {
-    setPhoto(result.assets[0].uri);
+    const localUri = result.assets[0].uri;
+    console.log('Selected image URI:', localUri);
+    setLocalPhoto(localUri); // показываем сразу
+    setLoadingImage(true);
+
+    console.log('Starting Cloudinary upload for post...');
+    const uploadedUrl = await uploadImageToCloudinary(localUri);
+    if (uploadedUrl) {
+      console.log('Upload successful, setting photo to:', uploadedUrl);
+      setPhoto(uploadedUrl);
+    } else {
+      console.log('Upload failed, showing error alert');
+      Alert.alert('Error', 'Failed to upload image to Cloudinary. Please try again.');
+      setLocalPhoto(null);
+    }
+    setLoadingImage(false);
   }
 };
-
  
-
 const deletePhoto = () => {
   setPhoto(null);
 };
@@ -58,8 +105,8 @@ return (
     <View style={styles.header}>
       <Image
         source={
-          userData?.avatar
-            ? { uri: userData.avatar }
+          userData?.profilePicture
+            ? { uri: userData.profilePicture }
             : require('../../assets/avatar_paw_pal.png')
         }
         style={styles.avatar}
@@ -69,13 +116,20 @@ return (
 
        <View style={styles.container}>
         <View style={styles.imageWrapper}>
-            {photo ? (
-            <Image source={{ uri: photo }} style={styles.image} />) : (
+        {localPhoto || photo ? (
+             <Image 
+                source={{ uri: photo || localPhoto }} 
+                style={styles.image} 
+                />
+         ) : (
             <View style={styles.placeholder}>
-             <Text style={styles.placeholderText}>No photo selected</Text>
-         </View>
-              )} 
-        
+                <Text style={styles.placeholderText}>No photo selected</Text>
+            </View>
+        )}
+
+        {loadingImage && (
+           <Text style={{ position: 'absolute', color: 'gray' }}>Uploading...</Text>
+            )}
       </View>
 
        <View style={styles.statsContainer}>
@@ -123,7 +177,7 @@ return (
                 }
 
         try {
-            const newPost  = await axios.post('http://192.168.1.83:3000/api/v1/posts/createPost', {
+            const newPost  = await axios.post(`http://${SERVER_CONFIG.SERVER_IP}:${SERVER_CONFIG.SERVER_PORT}/api/v1/posts/createPost`, {
               postId:uuid.v4(),
               author: userData?.uid,
                content: information,
@@ -169,14 +223,14 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
   padding: 20,
-  paddingBottom: 60, // чтобы не обрезалось внизу
+  paddingBottom: 60,  
 },
 buttonRow: {
   flexDirection: 'row',
   justifyContent: 'space-between',
   width: '90%',
   marginTop: 20,
-  gap: 10, // расстояние между кнопками
+  gap: 10,  
 },
 buttonSubmit: {
   height: 50,
@@ -241,11 +295,11 @@ buttonIcon: {
     fontWeight: 'bold',
   },
 image: {
-  width: '100%',         // на всю ширину экрана
-  aspectRatio: 1,        // делает высоту = ширине → квадрат
+  width: '100%',         
+  aspectRatio: 1,         
    borderTopLeftRadius: 30,
   borderTopRightRadius: 30,
-   position: 'relative' // чтобы кнопки были поверх изображения
+   position: 'relative' 
   
 },
   input: {
@@ -261,10 +315,10 @@ image: {
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
-    textAlignVertical: 'top',  // Чтобы текст начинался сверху (важно для multiline)
+    textAlignVertical: 'top',  
   },
   inputMultiline: {
-    height: 120,          // Высота для больших полей ввода
+    height: 120,          
   },
   background: {
     flex: 1,
@@ -287,8 +341,8 @@ username: {
 avatar: {
   width: 50,
   height: 50,
-  borderRadius: 50, // делает круглую аватарку
-  backgroundColor: '#080327ff', // светлый фон для аватарки
+  borderRadius: 50,  
+  backgroundColor: '#080327ff', 
   
   marginLeft: 20,
   marginRight: 10,
@@ -297,14 +351,14 @@ avatar: {
 },
 imageWrapper: {
   width: '100%',
-  aspectRatio: 1,         // квадрат, как и фото
+  aspectRatio: 1,          
  borderTopLeftRadius: 30,
   borderTopRightRadius: 30,
    
   overflow: 'hidden',
   borderWidth: 1,
   borderColor: '#ccc',
-  backgroundColor: '#f0f0f0',  // фон для пустой рамки
+  backgroundColor: '#f0f0f0',   
   justifyContent: 'center',
   alignItems: 'center',
 },

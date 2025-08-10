@@ -7,6 +7,7 @@ import { TextInput } from 'react-native';
 import { Image } from "react-native";
 import { KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import axios from 'axios';
+import { SERVER_CONFIG } from '../../config/serverConfig'; 
 
  
 const SignUpScreen = ({navigation}) => {
@@ -111,7 +112,7 @@ const SignUpScreen = ({navigation}) => {
                 console.log('Sign Up button pressed');
                 // Proceed with registration
                 try {
-                    const response = await axios.post('http://192.168.1.83:3000/api/v1/auth/register', {
+                    const response = await axios.post( `http://${SERVER_CONFIG.SERVER_IP}:${SERVER_CONFIG.SERVER_PORT}/api/v1/auth/register`,{
                         email: Email,
                          password: Password,
                          displayName: Name
@@ -194,7 +195,6 @@ const SignUpScreen = ({navigation}) => {
           paddingVertical: 10,
           paddingTop: 15,
           paddingBottom: 15,
-          fontSize: 16,
           color: '#000',
         },
     

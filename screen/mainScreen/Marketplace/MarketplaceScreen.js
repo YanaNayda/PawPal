@@ -7,16 +7,15 @@ import { useNavigation } from '@react-navigation/native';
  import { useFocusEffect } from '@react-navigation/native';
  import axios from 'axios';
  import ProductCard from '../cards/ProductCard.js'
- import { Searchbar } from 'react-native-paper';
  import FabGroupMarket from '../components/FABGroupMarket.js';
 import { useIsFocused } from '@react-navigation/native';
+import { SERVER_CONFIG } from '../../../config/serverConfig.js';
 
 import backgroundImage from '../../../assets/back_add.png';
 
 const MarketplaceScreen = () => {
   const isFocused = useIsFocused();
    const navigation = useNavigation();
-   const [searchQuery, setSearchQuery] = React.useState('');
   const {userData, setUserData } = useUser();
   const [products, setProducts] = useState([]);
 
@@ -28,7 +27,7 @@ useFocusEffect(
      
     const fetchProducts = async () => {
       try {
-        const res = await fetch(`http://192.168.1.83:3000/api/v1/market`);
+        const res = await fetch(`${SERVER_CONFIG.API_BASE_URL}/market`);
         if(!res.ok) {
           const text = await res.text();
           console.error("Server returned error:", text);
@@ -39,7 +38,7 @@ useFocusEffect(
         setProducts(data.productPosts);
         console.log('Fetched products:', data);
       } catch (error) {
-        console.error("Error fetching user posts", error);
+        console.error("Error fetching products:", error);
       }
     };
 
@@ -57,19 +56,6 @@ useFocusEffect(
       style={styles.background}
       resizeMode="cover"
     >
-    <View style={styles.spacer}> 
- 
-  
-
-    <Searchbar
-      placeholder="Search"
-      placeholderTextColor="#888"
-      style={{  margiTop: 15, borderRadius: 10, borderWidth: 2,  borderColor: '#bababaff', backgroundColor: '#fefefeff' }}
-      onChangeText={setSearchQuery}
-      value={searchQuery}
-    />
-    </View>
-    
       {isFocused && <FabGroupMarket />}
  
 
@@ -133,21 +119,10 @@ buttonText: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-buttonRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  width: '90%',
-  marginTop: 4,
-  gap: 4,  
-},
   buttonIcon: {
     width: 24,
     height: 24,
     marginRight: 10,
-  },
-  buttonText: {
-    fontSize: 16,
-    color: '#333',
   },
    profileRow: {
     flexDirection: 'row', 

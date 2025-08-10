@@ -3,6 +3,7 @@
 import React from 'react';
 import { useUser } from '../../context/UserContext';
 import { useEffect, useState } from 'react';
+import { SERVER_CONFIG } from '../../config/serverConfig.js';
 import { View, Text, StyleSheet, ImageBackground, Image,TouchableOpacity ,Alert , Button } from 'react-native';
 import { TextInput } from 'react-native';
 import { FlatList, ScrollView } from 'react-native-gesture-handler'
@@ -14,24 +15,38 @@ import { useNavigation } from '@react-navigation/native';
   import { FontAwesome } from '@expo/vector-icons';
 import { Feather } from '@expo/vector-icons';
 import { MaterialIcons } from '@expo/vector-icons';
-
-
-const PostScreen = (  ) => {
-  const navigation = useNavigation();
-  const route = useRoute();
  
-  const { post } = route.params; 
-  const {userData, setUserData } = useUser();
+
+const PostScreen = ({ route, navigation }) => {
+  const { postId, post: initialPost } = route?.params || {};
+  const { userData, setUserData } = useUser();
+  const [post, setPost] = useState(initialPost);
   const [avatar, setAvatar] = useState(null);
   const [username, setUsername] = useState(" ");
   const { v4: uuidv4 } = require('uuid');
   const [comments, setComments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [error, setError] = useState(null);
-  const [likes, setLikes] = useState(post.likes?.length || 0);
-  const [isLiked, setIsLiked] = useState(post.likes?.includes(userData?.uid));
+  const [likes, setLikes] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
 
+
+  // Initialize or fetch post data
+  useEffect(() => {
+    console.log('PostScreen useEffect - postId:', postId, 'initialPost:', initialPost);
+    
+    if (initialPost) {
+      console.log('Setting initial post data:', initialPost);
+      setPost(initialPost);
+      setComments(initialPost.comments || []);
+      setLikes(initialPost.likes?.length || 0);
+      setIsLiked(initialPost.likes?.includes(userData?.uid) || false);
+    } else if (postId) {
+      console.log('No initial post, fetching by postId:', postId);
+      fetchPostData();
+    }
+  }, [postId, initialPost, userData?.uid]);
 
   useEffect(() => {
      if (userData) {
@@ -40,17 +55,41 @@ const PostScreen = (  ) => {
      }
    }, [userData]);
 
-   useEffect(() => {
-   
-    if (typeof post.author === 'string') {
+  const fetchPostData = async () => {
+    try {
+      console.log('fetchPostData called with postId:', postId);
+      setLoading(true);
+      setError(null);
+      
+      const response = await axios.get(`${SERVER_CONFIG.API_BASE_URL}/posts/get-post/${postId}`);
+      console.log('fetchPostData response:', response.data);
+      
+      if (response.data.post) {
+        setPost(response.data.post);
+        setComments(response.data.post.comments || []);
+        setLikes(response.data.post.likes?.length || 0);
+        setIsLiked(response.data.post.likes?.includes(userData?.uid) || false);
+        setLoading(false);
+      } else {
+        setError('Post not found');
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error fetching post:', error);
+      setError('Failed to load post. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (post && typeof post.author === 'string') {
       if (post.author === userData?.uid) {
         setUsername(userData?.displayName || 'No name');
         setAvatar(userData?.photoURL || null);
       } else {
         const fetchAuthor = async () => {
           try {
-            const res = await axios.get(`http://192.168.1.83:3000/api/v1/users/${post.author}`);
-            console.log('Fetched author data:', JSON.stringify(res.data, null, 2));
+            const res = await axios.get(`${SERVER_CONFIG.API_BASE_URL}/users/${post.author}`);
             setUsername(res.data.user?.displayName || 'Unknown user');
             setAvatar(res.data.user?.photoURL || null);
           } catch (error) {
@@ -61,17 +100,47 @@ const PostScreen = (  ) => {
         fetchAuthor();
       }
     }
-  }, [post.author, userData]);
+  }, [post?.author, userData]);
 
-   useFocusEffect(
+  // Add error and loading states
+  if (loading && !post) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading post...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={fetchPostData}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!post) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Post not found</Text>
+      </View>
+    );
+  }
+
+  useFocusEffect(
   React.useCallback(() => {
     let isActive = true;
 
     const fetchUser = async () => {
       try {
         if (userData?.uid) {
-          const res = await axios.get(`http://192.168.1.83:3000/api/v1/users/${userData.uid}`);
-          console.log('Fetched user data:', JSON.stringify(res.data, null, 2));
+                      const res = await axios.get(`${SERVER_CONFIG.API_BASE_URL}/users/${userData.uid}`);
           setUserData(res.data.user);
         }
       } catch (e) {
@@ -81,12 +150,10 @@ const PostScreen = (  ) => {
 
     const fetchComments = async () => {
       try {
-        setLoading(true);
-        console.log('Fetching comments for postId:', post?.postId);
         if (!post?.postId) {
           throw new Error('Post ID is missing');
         }
-        const res = await axios.get(`http://192.168.1.83:3000/api/v1/posts/get-post/${post.postId}`);
+        const res = await axios.get(`${SERVER_CONFIG.API_BASE_URL}/posts/get-post/${post.postId}`);
         const postData = res.data.post;
         if (!postData) {
           throw new Error('Post not found');
@@ -128,7 +195,7 @@ const PostScreen = (  ) => {
 
 const handleDeletePost = async () => {
   try {
-    await axios.delete(`http://192.168.1.83:3000/api/v1/posts/delete-post/${post.postId}`, {
+    await axios.delete(`${SERVER_CONFIG.API_BASE_URL}/posts/delete-post/${post.postId}`, {
       data: { userId: userData.uid },
     });
     navigation.goBack();
@@ -146,7 +213,7 @@ const handleDeletePost = async () => {
 
   try {
     const res = await axios.put(
-      `http://192.168.1.83:3000/api/v1/posts/like-post/${post.postId}`,
+      `${SERVER_CONFIG.API_BASE_URL}/posts/like-post/${post.postId}`,
       { userId: userData.uid }
     );
 
@@ -181,7 +248,7 @@ const handleAddComment = async () => {
     };
     console.log('Sending comment data:', commentData);
 
-    const res = await axios.post(`http://192.168.1.83:3000/api/v1/comments/createComment`, commentData);
+          const res = await axios.post(`${SERVER_CONFIG.API_BASE_URL}/comments/createComment`, commentData);
 
     const newAddedComment = res.data.comment;
     setComments([...comments, newAddedComment]);
@@ -197,7 +264,7 @@ const handleDeleteComment = async (commentId) => {
  
   try {
     console.log('Deleting comment:', commentId);
-   const res = await axios.delete(`http://192.168.1.83:3000/api/v1/comments/deleteComment/${commentId}`, {
+   const res = await axios.delete( `http://${SERVER_CONFIG.SERVER_IP}:${SERVER_CONFIG.SERVER_PORT}/api/v1/comments/deleteComment/${commentId}`, {
       data: { userId: userData.uid },
     });
 
@@ -234,6 +301,8 @@ const showAlertDelete = () =>
     },
   );
 
+
+  
 if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -269,7 +338,22 @@ if (loading) {
           }
           style={styles.profileImage}
         />
-  <Text style={styles.profileName}>{username || 'No name'}</Text>
+        <TouchableOpacity 
+          onPress={() => {
+            if (post.author) {
+              // Handle both string UID and object with uid property
+              const authorId = typeof post.author === 'string' 
+                ? post.author 
+                : post.author.uid;
+              
+              if (authorId) {
+                navigation.navigate('ViewUser', { userId: authorId });
+              }
+            }
+          }}
+        >
+          <Text style={styles.profileName}>{username || 'No name'}</Text>
+        </TouchableOpacity>
 </View>
         
          {post.imageUrl && <Image source={{ uri: post.imageUrl }} style={styles.postImage} />}
@@ -324,7 +408,7 @@ if (loading) {
       <FlatList
         data={comments}
         renderItem={({ item }) => <CommentsCard comment={item} onDeletePress={handleDeleteComment}/>}
-        keyExtractor={(item) => item._id || item.commentId}
+        keyExtractor={(item, index) => item._id || item.commentId || `comment-${index}`}
         contentContainerStyle={styles.commentList}
         ListEmptyComponent={<Text style={styles.noComments}> No comments found...</Text>}
         style={styles.flatList}
@@ -376,17 +460,6 @@ profileName: {
   fontWeight: 'bold',
   color: '#333',
 },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  profileName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
   postContent: {
     fontSize: 16,
     color: '#333',
@@ -472,5 +545,32 @@ actionText: {
   fontSize: 16,
   marginLeft: 6,
   color: '#333',
+},
+loadingText: {
+  fontSize: 16,
+  color: '#666',
+},
+errorContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#f5f5f5',
+},
+errorText: {
+  fontSize: 16,
+  color: '#666',
+  textAlign: 'center',
+  marginBottom: 20,
+},
+retryButton: {
+  backgroundColor: '#FF6347',
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+  borderRadius: 8,
+},
+retryButtonText: {
+  color: 'white',
+  fontSize: 14,
+  fontWeight: '600',
 },
 });

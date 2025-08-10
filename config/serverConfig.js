@@ -4,7 +4,7 @@
 
 export const SERVER_CONFIG = {
   // Your computer's IP address (found using ifconfig command)
-  SERVER_IP: '192.168.1.83',
+  SERVER_IP: '192.168.1.86',
   SERVER_PORT: 3000,
   
   // API Base URL

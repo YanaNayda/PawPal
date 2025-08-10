@@ -25,6 +25,7 @@ export default function MessagesChatScreen({ route, navigation }) {
   const [typingUser, setTypingUser] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [typingTimeout, setTypingTimeout] = useState(null);
+  const [showParticipants, setShowParticipants] = useState(false);
 
   // Check if we need to refresh (coming from AddParticipantsScreen)
   const shouldRefresh = route.params?.refresh;
@@ -197,6 +198,34 @@ export default function MessagesChatScreen({ route, navigation }) {
     }
   };
 
+  const getChatParticipants = () => {
+    if (!chat?.members || !userData) return [];
+    
+    // Filter out current user and return other participants
+    return chat.members.filter(member => member.uid !== userData.uid);
+  };
+
+  const getChatTitle = () => {
+    if (chat?.chatName) {
+      return chat.chatName; // Group chat with custom name
+    }
+    
+    const participants = getChatParticipants();
+    
+    if (participants.length === 0) {
+      return 'Unknown Chat';
+    } else if (participants.length === 1) {
+      return participants[0].displayName || 'Unknown User'; // 1-on-1 chat
+    } else if (participants.length === 2) {
+      const name1 = participants[0].displayName || 'Unknown User';
+      const name2 = participants[1].displayName || 'Unknown User';
+      return `${name1}, ${name2}`; // 2 participants
+    } else {
+      const firstName = participants[0].displayName || 'Unknown User';
+      return `${firstName} +${participants.length - 1} others`; // Multiple participants
+    }
+  };
+
   const handleLeaveChat = () => {
     Alert.alert(
       'Leave Chat',
@@ -304,16 +333,24 @@ export default function MessagesChatScreen({ route, navigation }) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
+          <TouchableOpacity 
+            style={styles.headerLeft}
+            onPress={() => {
+              const participants = getChatParticipants();
+              if (participants.length > 1) {
+                setShowParticipants(!showParticipants);
+              }
+            }}
+          >
             <Text style={styles.headerTitle}>
-              {otherUser?.displayName || 'Chat'}
+              {getChatTitle()}
             </Text>
             {chat?.members && chat.members.length > 2 && (
               <Text style={styles.participantCount}>
                 {chat.members.length} participants
               </Text>
             )}
-          </View>
+          </TouchableOpacity>
           <View style={styles.headerActions}>
             {otherUser?.isOnline && (
               <Text style={styles.onlineStatus}>Online</Text>
@@ -335,6 +372,19 @@ export default function MessagesChatScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+
+        {showParticipants && (
+          <View style={styles.participantsContainer}>
+            <Text style={styles.participantsTitle}>Participants</Text>
+            {getChatParticipants().map((participant, index) => (
+              <View key={participant.uid} style={styles.participantItem}>
+                <Text style={styles.participantName}>
+                  {participant.displayName || 'Unknown User'}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <FlatList
           data={messages}
@@ -543,5 +593,26 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 3,
     fontStyle: 'italic',
+  },
+  participantsContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  participantsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  participantItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  participantName: {
+    fontSize: 14,
+    color: '#333',
   },
 });

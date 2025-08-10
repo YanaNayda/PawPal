@@ -5,6 +5,8 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import { Keyboard, TouchableWithoutFeedback } from 'react-native';
 import axios from 'axios';
 import { Alert } from 'react-native';
+import { SERVER_CONFIG } from '../../config/serverConfig'; 
+
 
 export default function ForgotPasswordScreen({ navigation })  {
 
@@ -59,7 +61,7 @@ export default function ForgotPasswordScreen({ navigation })  {
               return;
             }
 
-            axios.post('http://192.168.1.83:3000/api/v1/auth/forgotpassword', {email})
+            axios.post(`http://${SERVER_CONFIG.SERVER_IP}:${SERVER_CONFIG.SERVER_PORT}/api/v1/auth/forgotpassword`, {email})
 
                       .then(res => {
                         //Alert is async ? 
@@ -151,7 +153,6 @@ const styles = StyleSheet.create({
       paddingVertical: 10,
       paddingTop: 15,
       paddingBottom: 15,
-      fontSize: 16,
       color: '#000',
     },
 

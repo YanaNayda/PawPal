@@ -7,12 +7,13 @@ import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { SERVER_CONFIG } from '../../../config/serverConfig.js';
 
 const ProductScreen = () => {
   const { userData, setUserData } = useUser();
   const route = useRoute();
   const navigation = useNavigation();
-  const { product } = route.params;
+  const product = route.params?.product;
 
   const [username, setUsername] = useState('No name');
   const [avatar, setAvatar] = useState(null);
@@ -28,7 +29,7 @@ const ProductScreen = () => {
         setUsername(userData?.displayName || 'No name');
         setAvatar(userData?.photoURL || null);
       } else {
-        const res = await axios.get(`http://192.168.1.83:3000/api/v1/users/${product.seller}`);
+        const res = await axios.get(`${SERVER_CONFIG.API_BASE_URL}/users/${product.seller}`);
         setUsername(res.data.user?.displayName || 'Unknown user');
         setAvatar(res.data.user?.photoURL || null);
       }
@@ -48,7 +49,7 @@ const ProductScreen = () => {
       const fetchUser = async () => {
         try {
           if (userData?.uid) {
-            const res = await axios.get(`http://192.168.1.83:3000/api/v1/users/${userData.uid}`);
+            const res = await axios.get(`${SERVER_CONFIG.API_BASE_URL}/users/${userData.uid}`);
             console.log('Fetched user data:', JSON.stringify(res.data, null, 2));
             if (isActive) setUserData(res.data.user);
           }
@@ -71,7 +72,7 @@ const handleDeleteProduct = async () => {
 
   try {
     await axios.delete(
-      `http://192.168.1.83:3000/api/v1/market/delete-product-post/${product.productId}`,
+      `${SERVER_CONFIG.API_BASE_URL}/market/delete-product-post/${product.productId}`,
       {
         data: { userId: userData.uid },
       }
@@ -85,6 +86,18 @@ const handleDeleteProduct = async () => {
   }
 };
 
+const handleChatWithSeller = () => {
+  if (!product?.seller || !userData?.uid) {
+    setError('Unable to start chat. Missing user information.');
+    return;
+  }
+
+  // Navigate to CreateChat with the seller pre-selected
+  navigation.navigate('CreateChat', {
+    preSelectedUsers: [product.seller]
+  });
+};
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -96,7 +109,14 @@ const handleDeleteProduct = async () => {
   if (!product) {
     return (
       <View style={styles.loadingContainer}>
-        <Text> Oooops...Maybe the dog stole your content.</Text>
+        <Text style={styles.errorText}>Product not found</Text>
+        <Text style={styles.errorSubtext}>The product you're looking for doesn't exist or has been removed.</Text>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -110,29 +130,22 @@ const handleDeleteProduct = async () => {
       <View style={{ flex: 1 }}>
         <View style={styles.postHeader}>
           <View style={styles.authorRow}>
-            <Image
-              source={
-                avatar
-                  ? { uri: avatar }
-                  : require('../../../assets/avatar_paw_pal.png')
-              }
-              style={styles.profileImage}
-            />
+            
             <Text style={styles.profileName}>{username || 'No name'}</Text>
           </View>
              {product.imageUrl && <Image source={{ uri: product.imageUrl }} style={styles.postImage} />}
-         <View style={styles.Row}> 
-           
-          <Text style={styles.postTitle}>{product.title}</Text>
+         <View style={styles.titleContainer}> 
+          <Text style={styles.postTitle} numberOfLines={3} ellipsizeMode="tail">{product.title}</Text>
+         </View>
          
-          {product.seller !== userData?.uid &&   
-           <View style={styles.Row}> 
-             <TouchableOpacity style={styles.chatButton}  > 
-               <Icon name="send" size={16} color="#FF6347S" style={{ marginRight: 3 }}/>
+         {product.seller !== userData?.uid &&   
+           <View style={styles.actionRow}> 
+             <TouchableOpacity style={styles.chatButton} onPress={handleChatWithSeller}> 
+               <Icon name="chat" size={16} color="white" style={{ marginRight: 5 }}/>
+               <Text style={styles.chatButtonText}>Chat with Seller</Text>
               </TouchableOpacity>
              </View>
           }
-          </View>
           <Text style={styles.postContent}>Description: {product.description}</Text>
           
             <View style={styles.Row}> 
@@ -157,8 +170,15 @@ const handleDeleteProduct = async () => {
 
          </View>
             <Text style={styles.postDate}>{new Date(product.createdAt).toLocaleDateString('en-US')}</Text>
-          {error && <Text style={styles.errorText}>{error}</Text>}
+          {error && <Text style={styles.errorText}>{error}</Text>} 
 
+           {product.seller === userData?.uid &&   
+           <View style={styles.Row}> 
+             <TouchableOpacity style={styles.chatButton}  onPress={handleDeleteProduct} > 
+               <Icon name="delete" size={16} color="#FF6347S" style={{ marginRight: 3 }}/>
+              </TouchableOpacity>
+             </View>
+          }
            
         </View>
       </View>
@@ -196,6 +216,33 @@ const styles = StyleSheet.create({
   borderTopColor: '#eee',
   padding: 10,
 },
+  titleContainer: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  chatButton: {
+    backgroundColor: '#FF6347',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  chatButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -217,6 +264,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginVertical: 5,
     color: '#222',
+    lineHeight: 24,
   },
   postContent: {
     fontSize: 16,
@@ -241,12 +289,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     textAlign: 'left',
   },
-  chatButton: {
-    backgroundColor: '#FF6347',
-    padding: 10,
-     borderRadius: 8,
-    alignItems: 'center',
-  },
+
   
   deleteButton: {
     marginTop: 10,
@@ -261,7 +304,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   errorText: {
-    color: 'red',
-    marginTop: 10,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  backButton: {
+    backgroundColor: '#FF6347',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

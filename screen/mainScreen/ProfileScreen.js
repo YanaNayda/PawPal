@@ -8,40 +8,35 @@ import { useNavigation } from '@react-navigation/native';
  import CreatePost from './CreatePost';
  import { useFocusEffect } from '@react-navigation/native';
  import axios from 'axios';
- import PostCard from './cards/PostCard'
-import { Dimensions } from 'react-native';
-
+ import PostCardHome from './cards/PostCardHome'
+import ProductCard from './cards/ProductCard'
+import { SegmentedButtons } from 'react-native-paper';
+import { SERVER_CONFIG } from '../../config/serverConfig.js';
 
 const ProfileScreen = ( ) => {
 
- 
-
-  const screenWidth = Dimensions.get('window').width;
-  const itemMargin = 4;
-  const numColumns = 3;
- 
   const navigation = useNavigation();
   const {userData, setUserData } = useUser();
   const [avatar, setAvatar] = useState(null);
   const [username, setUsername] = useState(" ");
   const [bio, setBio] = useState(" ");
-  const [friends, setFriends] = useState(" ");
-  const [posts, setPosts] = useState(" ");
-  const friendCount = userData?.friends?.length || 0;  
-  const postsCount = userData?.userPostsCount || 0;
+  const [following, setFollowing] = useState(0);
+  const [followers, setFollowers] = useState(0);
+  const [posts, setPosts] = useState(0);
+  const [products, setProducts] = useState(0);
   const [userPosts, setUserPosts] = useState([]);
-  const itemSize = (screenWidth - itemMargin * (numColumns * 2) - 40) / numColumns; 
-
- 
+  const [userProducts, setUserProducts] = useState([]);
+  const [activeTab, setActiveTab] = useState('posts'); // 'posts' or 'products' 
 
   useEffect(() => {
     if (userData) {
       setUsername(userData.displayName || "No name");
-      setBio(userData.bio || "No informarion about you :(");
-      setAvatar(userData.photoURL || null);
-      setFriends(friendCount);
-      setPosts(postsCount);
-    
+      setBio(userData.bio || "No information about you :(");
+       setAvatar(userData.profilePicture || null); 
+      setFollowing(userData.followings?.length || 0);
+      setFollowers(userData.followers?.length || 0);
+      setPosts(userData.userPostsCount || 0);
+      setProducts(userData.userProductsCount || 0);
     }
   }, [userData]);
  
@@ -49,7 +44,7 @@ const ProfileScreen = ( ) => {
   React.useCallback(() => {
     const fetchUser = async () => {
       try {
-        const res = await axios.get(`http://192.168.1.83:3000/api/v1/users/${userData.uid}`);
+        const res = await axios.get(`${SERVER_CONFIG.API_BASE_URL}/users/${userData.uid}`);
         setUserData(res.data.user);
       } catch (e) {
         console.log('Failed to fetch user:', e);
@@ -58,7 +53,7 @@ const ProfileScreen = ( ) => {
 
     const fetchPosts = async () => {
       try {
-        const res = await fetch(`http://192.168.1.83:3000/api/v1/posts/user/${userData.uid}`);
+        const res = await fetch(`${SERVER_CONFIG.API_BASE_URL}/posts/user/${userData.uid}`);
         if (!res.ok) {
           const text = await res.text();
           console.error("Server returned error:", text);
@@ -71,8 +66,26 @@ const ProfileScreen = ( ) => {
       }
     };
 
+    const fetchProducts = async () => {
+      try {
+        const res = await fetch(`${SERVER_CONFIG.API_BASE_URL}/market`);
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("Server returned error:", text);
+          throw new Error("Server error: " + res.status);
+        }
+        const data = await res.json();
+        // Filter products by current user
+        const userProducts = data.productPosts.filter(product => product.seller === userData.uid);
+        setUserProducts(userProducts);
+      } catch (error) {
+        console.error("Error fetching user products", error);
+      }
+    };
+
     fetchUser();
-    fetchPosts();  
+    fetchPosts();
+    fetchProducts();  
   }, [userData.uid])
 );
 
@@ -93,7 +106,7 @@ const ProfileScreen = ( ) => {
     if (!result.canceled) {
       setAvatar(result.assets[0].uri);
       try {
-        await axios.put(`http://192.168.1.83:3000/api/v1/users/${userData.uid}`, {
+        await axios.put(`${SERVER_CONFIG.API_BASE_URL}/users/${userData.uid}`, {
           photoURL: result.assets[0].uri,
         });
       } catch (e) {
@@ -106,11 +119,17 @@ const ProfileScreen = ( ) => {
    
    
   const renderPost = ({ item }) => (
+    <View style={styles.postWrapper}>
+      <PostCardHome post={item} />
+    </View>
+  );
+
+  const renderProduct = ({ item }) => (
     <TouchableOpacity
-      style={[styles.postWrapper, { width: itemSize, height: itemSize }]}
-      onPress={() => navigation.navigate('PostScreen', { post: item })}
+      style={styles.productWrapper}
+      onPress={() => navigation.navigate('ProductScreen', { product: item })}
     >
-      <PostCard post={item} />
+      <ProductCard product={item} />
     </TouchableOpacity>
   );
 
@@ -144,8 +163,13 @@ const ProfileScreen = ( ) => {
             </View>
             <View style={styles.divider} />
             <View style={styles.statItem}>
-              <Text style={styles.statLabel}>FRIENDS</Text>
-              <Text style={styles.statValue}>{friends}</Text>
+              <Text style={styles.statLabel}>FOLLOWING</Text>
+              <Text style={styles.statValue}>{following}</Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>FOLLOWERS</Text>
+              <Text style={styles.statValue}>{followers}</Text>
             </View>
           </View>
 
@@ -172,16 +196,43 @@ const ProfileScreen = ( ) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.postsContainer}>
-            <FlatList
-              data={userPosts}
-              keyExtractor={(item) => item._id}
-              numColumns={numColumns}
-              renderItem={renderPost}
-              contentContainerStyle={styles.postsList}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<Text style={styles.emptyText}>No posts to display yet.</Text>}
+          <View style={styles.tabContainer}>
+            <SegmentedButtons
+              value={activeTab}
+              onValueChange={setActiveTab}
+              buttons={[
+                { value: 'posts', label: 'Posts' },
+                { value: 'products', label: 'Products' }
+              ]}
+              style={styles.segmentedButtons}
             />
+          </View>
+
+          <View style={styles.contentContainer}>
+            {activeTab === 'posts' ? (
+              <FlatList
+                key="posts-list"
+                data={userPosts}
+                keyExtractor={(item) => item._id}
+                numColumns={1}
+                renderItem={renderPost}
+                contentContainerStyle={styles.postsList}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={<Text style={styles.emptyText}>No posts to display yet.</Text>}
+              />
+            ) : (
+              <FlatList
+                key="products-list"
+                data={userProducts}
+                keyExtractor={(item) => item._id}
+                numColumns={2}
+                renderItem={renderProduct}
+                contentContainerStyle={styles.productsList}
+                columnWrapperStyle={styles.productRow}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={<Text style={styles.emptyText}>No products to display yet.</Text>}
+              />
+            )}
           </View>
         </View>
       </ImageBackground>
@@ -200,9 +251,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:'#ffffff',
-     alignItems: 'center',
-    justifyContent: 'center',
-    
   },
   block: {
     backgroundColor: '#ffffff',
@@ -210,9 +258,6 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 5,
     width: '100%',
-     alignItems: 'center',
-    justifyContent: 'center',
-    
   },
   profileRow: {
     flexDirection: 'row',
@@ -285,7 +330,6 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     width: '100%',
     marginBottom: 10,
     alignItems: 'center',
@@ -318,18 +362,49 @@ const styles = StyleSheet.create({
     marginRight: 4,
     tintColor: '#ffffff',
   },
+  tabContainer: {
+    width: '100%',
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
+  segmentedButtons: {
+    marginBottom: 10,
+  },
+  contentContainer: {
+    flex: 1,
+    width: '100%',
+  },
   postsContainer: {
     flex: 1,
     width: '100%',
-     alignItems: 'center',
-    justifyContent: 'center',
   },
   postsList: {
     paddingBottom: 20,
+    paddingHorizontal: 0,
+  },
+  productsList: {
+    paddingBottom: 20,
+    paddingHorizontal: 5,
+  },
+  productRow: {
+    justifyContent: 'space-between',
   },
   postWrapper: {
-    borderRadius: 5,
-    margin:3,
+    marginBottom: 10,
+    marginHorizontal: 0,
+    borderRadius: 0,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  productWrapper: {
+    width: '48%',
+    marginBottom: 10,
+    borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#ffffff',
     shadowColor: '#000',

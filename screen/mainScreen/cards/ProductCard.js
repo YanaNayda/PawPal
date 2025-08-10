@@ -22,20 +22,21 @@ export default function ProductCard({product}) {
                 resizeMode="cover"
                 />
             
-            
-            <Text style ={styles.productTextTitle}>{product.title}</Text>
-            <Text style ={styles.productTextCategories}> Category: {product.category}</Text>
-            <View style={styles.Row}> 
-               <Icon name="location-pin" size={16} color="#FF6347S" style={{ marginRight: 3 }}/>
-             <Text style ={styles.productText}> Location: {product.location}</Text>
-           </View>
+            <View style={styles.contentContainer}>
+                <Text style ={styles.productTextTitle} numberOfLines={2} ellipsizeMode="tail">{product.title}</Text>
+                <Text style ={styles.productTextCategories}> Category: {product.category}</Text>
+                <View style={styles.Row}> 
+                   <Icon name="location-pin" size={16} color="#FF6347S" style={{ marginRight: 3 }}/>
+                 <Text style ={styles.productText}> Location: {product.location}</Text>
+               </View>
 
-            <View style={styles.Row}>
-            <Text style={styles.productDate}>
-            {new Date(product.createdAt).toLocaleDateString()}
-           </Text>
-            <Text style ={styles.productText}> Price: {product.price} ₪</Text>
-           </View>
+                <View style={styles.Row}>
+                <Text style={styles.productDate}>
+                {new Date(product.createdAt).toLocaleDateString()}
+               </Text>
+                <Text style ={styles.productText}> Price: {product.price} ₪</Text>
+               </View>
+            </View>
         </View>
     )
 }
@@ -46,11 +47,17 @@ productCard: {
   padding: 10,
   marginBottom: 15,
   width: '100%',
+  height: 320, // Fixed height for consistent card sizes
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 3 },
   shadowOpacity: 0.3,
   shadowRadius: 7,
   elevation: 7,
+},
+contentContainer: {
+  flex: 1,
+  justifyContent: 'space-between',
+  paddingTop: 5,
 },
 productImage: {
   width: '100%',
@@ -58,37 +65,39 @@ productImage: {
   borderRadius: 10,
 },
 productText: {
-  fontSize: 16,
-   
+  fontSize: 14,
+  lineHeight: 16,
 },
 productTextCategories: {
   fontSize: 12,
-   
+  height: 16, // Fixed height for category
+  lineHeight: 16,
+  marginBottom: 5,
 },
 productTextTitle: {
-  fontSize: 18,
+  fontSize: 16,
   fontWeight: 'bold',
-   
   marginTop: 5,
-  paddingBottom: 5,
+  marginBottom: 5,
   color: '#333',
-  paddingRight: 20,
-   
+  height: 40, // Fixed height for title area
+  lineHeight: 20,
 },
 productDate: {
   fontSize: 12,
   color: 'gray',
   textAlign: 'right',
-  paddingRight: 15,
+  lineHeight: 16,
 },
 Row: {
   flexDirection: 'row',
   justifyContent: 'space-between',
   alignItems: 'center',
-  marginTop: 10,
+  marginTop: 5,
   borderTopWidth: 1,
   borderTopColor: '#eee',
-  padding: 10,
+  padding: 8,
+  height: 30, // Fixed height for row
 },
 Button: {
   flexDirection: 'row',

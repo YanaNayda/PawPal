@@ -121,7 +121,35 @@ export default function ChatScreen({ navigation, route }) {
 
   const getOtherUser = (chat) => {
     if (!chat.members || !userData) return null;
-    return chat.members.find(member => member !== userData.uid);
+    return chat.members.find(member => member.uid !== userData.uid);
+  };
+
+  const getChatParticipants = (chat) => {
+    if (!chat.members || !userData) return [];
+    
+    // Filter out current user and return other participants
+    return chat.members.filter(member => member.uid !== userData.uid);
+  };
+
+  const getChatTitle = (chat) => {
+    if (chat.chatName) {
+      return chat.chatName; // Group chat with custom name
+    }
+    
+    const participants = getChatParticipants(chat);
+    
+    if (participants.length === 0) {
+      return 'Unknown Chat';
+    } else if (participants.length === 1) {
+      return participants[0].displayName || 'Unknown User'; // 1-on-1 chat
+    } else if (participants.length === 2) {
+      const name1 = participants[0].displayName || 'Unknown User';
+      const name2 = participants[1].displayName || 'Unknown User';
+      return `${name1}, ${name2}`; // 2 participants
+    } else {
+      const firstName = participants[0].displayName || 'Unknown User';
+      return `${firstName} +${participants.length - 1} others`; // Multiple participants
+    }
   };
 
   const getLastMessageText = (chat) => {
@@ -147,33 +175,76 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const renderChatItem = ({ item }) => {
-    const otherUser = getOtherUser(item);
-    if (!otherUser) return null;
+    const participants = getChatParticipants(item);
+    if (participants.length === 0) return null;
+
+    const isGroupChat = participants.length > 1 || item.chatName;
+    const chatTitle = getChatTitle(item);
+    const firstParticipant = participants[0];
 
     return (
       <TouchableOpacity
         style={styles.chatItem}
         onPress={() => navigation.navigate('MessagesChat', { 
-          chatId: item.chatId, // Changed from item._id to item.chatId
-          otherUser: otherUser,
+          chatId: item.chatId,
+          otherUser: firstParticipant,
           chat: item
         })}
       >
         <View style={styles.avatarContainer}>
-          <Image
-            source={
-              otherUser.profilePicture
-                ? { uri: otherUser.profilePicture }
-                : require('../../assets/avatar_paw_pal.png')
-            }
-            style={styles.avatar}
-          />
-          {otherUser.isOnline && <View style={styles.onlineIndicator} />}
+          {isGroupChat ? (
+            // Group chat - show multiple avatars or group icon
+            <View style={styles.groupAvatarContainer}>
+              {participants.length === 2 ? (
+                // Show two avatars side by side
+                <View style={styles.dualAvatarContainer}>
+                  <Image
+                    source={
+                      participants[0].profilePicture
+                        ? { uri: participants[0].profilePicture }
+                        : require('../../assets/avatar_paw_pal.png')
+                    }
+                    style={styles.groupAvatar1}
+                  />
+                  <Image
+                    source={
+                      participants[1].profilePicture
+                        ? { uri: participants[1].profilePicture }
+                        : require('../../assets/avatar_paw_pal.png')
+                    }
+                    style={styles.groupAvatar2}
+                  />
+                </View>
+              ) : (
+                // Show group icon for larger groups
+                <View style={styles.groupIconContainer}>
+                  <Text style={styles.groupIconText}>
+                    {participants.length > 2 ? participants.length : 'G'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            // 1-on-1 chat - show single avatar
+            <>
+              <Image
+                source={
+                  firstParticipant.profilePicture
+                    ? { uri: firstParticipant.profilePicture }
+                    : require('../../assets/avatar_paw_pal.png')
+                }
+                style={styles.avatar}
+              />
+              {firstParticipant.isOnline && <View style={styles.onlineIndicator} />}
+            </>
+          )}
         </View>
         
         <View style={styles.chatInfo}>
           <View style={styles.chatHeader}>
-            <Text style={styles.userName}>{otherUser.displayName}</Text>
+            <Text style={styles.userName} numberOfLines={1}>
+              {chatTitle}
+            </Text>
             <Text style={styles.timeText}>
               {formatTime(item.lastMessage?.timestamp)}
             </Text>
@@ -181,6 +252,11 @@ export default function ChatScreen({ navigation, route }) {
           <Text style={styles.lastMessage} numberOfLines={1}>
             {getLastMessageText(item)}
           </Text>
+          {isGroupChat && participants.length > 2 && (
+            <Text style={styles.participantCount}>
+              {participants.length} participant{participants.length !== 1 ? 's' : ''}
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -299,6 +375,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     borderWidth: 2,
     borderColor: 'white',
+  },
+  groupAvatarContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  dualAvatarContainer: {
+    flexDirection: 'row',
+    width: 50,
+    height: 50,
+  },
+  groupAvatar1: {
+    width: 25,
+    height: 50,
+    borderTopLeftRadius: 25,
+    borderBottomLeftRadius: 25,
+  },
+  groupAvatar2: {
+    width: 25,
+    height: 50,
+    borderTopRightRadius: 25,
+    borderBottomRightRadius: 25,
+  },
+  groupIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FF6347',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  groupIconText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  participantCount: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   chatInfo: {
     flex: 1,
