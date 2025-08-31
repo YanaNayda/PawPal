@@ -4,20 +4,18 @@ import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawe
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from '../context/UserContext';
  
- 
+
 
 export default function CustomDrawerContent(props) {
     const { navigation } = props;
     const { setUserData } = useUser();
-  const handleLogout = async () => {
-  try {
-    await AsyncStorage.removeItem("token");  
-    setUserData(null);
-    navigation.replace("LogIn");
-  } catch (error) {
-    console.error("Error clearing token: ", error);
-  }
-};
+    const handleLogout = async () => {
+      try {
+        navigation.replace("LogIn");
+      } catch (error) {
+        console.error("Error logging out: ", error);
+      }
+    };
 
     return (
        <View style={{ flex: 1 }}>

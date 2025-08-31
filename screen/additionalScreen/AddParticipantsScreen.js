@@ -29,7 +29,7 @@ export default function AddParticipantsScreen({ route, navigation }) {
   const loadAllUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.1.83:3000/api/v1/users/all`);
+      const response = await fetch(`http://192.168.1.165:3000/api/v1/users/all`);
       const data = await response.json();
       
       // Filter out current members and the current user

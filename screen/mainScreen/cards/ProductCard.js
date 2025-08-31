@@ -22,20 +22,31 @@ export default function ProductCard({product}) {
                 resizeMode="cover"
                 />
             
-            
-            <Text style ={styles.productTextTitle}>{product.title}</Text>
-            <Text style ={styles.productTextCategories}> Category: {product.category}</Text>
-            <View style={styles.Row}> 
-               <Icon name="location-pin" size={16} color="#FF6347S" style={{ marginRight: 3 }}/>
-             <Text style ={styles.productText}> Location: {product.location}</Text>
-           </View>
+            <View style={styles.contentContainer}>
+                <Text style ={styles.productTextTitle} numberOfLines={2} ellipsizeMode="tail">{product.title}</Text>
+                 
+                <View style={styles.Row}> 
+                  <View style={styles.rowInline}>
+                    <Icon name="location-pin" size={16} color="#FF6347" style={{  }}/>
+                    <Text style={styles.productText}>Location: {product.location}</Text>
+                  </View>
+                </View>
+                 
+                <View style={styles.Row}> 
+                  <View style={styles.rowInline}>
+                    <Icon name="category" size={16} color="#1135abff" style={{  }}/>
+                     <Text style ={styles.productTextCategories}> Category: {product.category}</Text>
+                  </View>
+                </View>
 
-            <View style={styles.Row}>
-            <Text style={styles.productDate}>
-            {new Date(product.createdAt).toLocaleDateString()}
-           </Text>
-            <Text style ={styles.productText}> Price: {product.price} ₪</Text>
-           </View>
+                
+                <View style={styles.Row}>
+                  <Text style={styles.productDate}>
+                    {new Date(product.createdAt).toLocaleDateString()}
+                  </Text>
+                  <Text style ={styles.productText}> Price: {product.price} ₪</Text>
+               </View>
+            </View>
         </View>
     )
 }
@@ -46,58 +57,51 @@ productCard: {
   padding: 10,
   marginBottom: 15,
   width: '100%',
+  height: 320, // Fixed height for consistent card sizes
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 3 },
   shadowOpacity: 0.3,
   shadowRadius: 7,
   elevation: 7,
 },
-productImage: {
-  width: '100%',
-  height: 200,
-  borderRadius: 10,
+rowInline: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+contentContainer: {
+  flex: 1,
+  justifyContent: 'space-between',
+  paddingTop: 5,
 },
 productText: {
-  fontSize: 16,
-   
+  fontSize: 14,
+  lineHeight: 16,
+
 },
 productTextCategories: {
-  fontSize: 12,
-   
+  fontSize: 14,
+  height: 16,
+
 },
 productTextTitle: {
-  fontSize: 18,
+  fontSize: 16,
   fontWeight: 'bold',
-   
   marginTop: 5,
-  paddingBottom: 5,
   color: '#333',
-  paddingRight: 20,
-   
 },
 productDate: {
   fontSize: 12,
   color: 'gray',
   textAlign: 'right',
-  paddingRight: 15,
+  lineHeight: 16,
 },
 Row: {
   flexDirection: 'row',
   justifyContent: 'space-between',
   alignItems: 'center',
-  marginTop: 10,
   borderTopWidth: 1,
   borderTopColor: '#eee',
-  padding: 10,
+  paddingTop: 8,
+ 
 },
-Button: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 6,
-},
-actionText: {
-  fontSize: 14,
-  color: 'black',
-},
-
 })

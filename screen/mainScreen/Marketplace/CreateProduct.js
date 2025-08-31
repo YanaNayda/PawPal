@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import {View,Text,StyleSheet,Pressable,ImageBackground,Image,TouchableOpacity,Button,TextInput,ScrollView,Platform,KeyboardAvoidingView,Keyboard,Alert,} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {View,Text,StyleSheet,    Pressable,ImageBackground,Image,TouchableOpacity,Button,TextInput,ScrollView,Platform,KeyboardAvoidingView,Keyboard,Alert,} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import backgroundImage from '../../../assets/white_back.png';
 import { useUser } from '../../../context/UserContext.js';
@@ -12,6 +12,7 @@ import ListCategoriesProducts from '../components/ListCategoriesProduct.js';
  import { SegmentedButtons } from 'react-native-paper';
  import { TouchableWithoutFeedback } from 'react-native-gesture-handler';
 import { FlatList } from 'react-native-gesture-handler';
+import { SERVER_CONFIG } from '../../../config/serverConfig.js';
 
 
 const CreateProduct = ({ navigation }) => {
@@ -21,10 +22,56 @@ const CreateProduct = ({ navigation }) => {
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
  
+  const [username, setUsername] = useState('');
+  const [avatar, setAvatar] = useState(null);
+
   const [status, setStatus] = useState('')
   const [title, setTitle] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [localPhoto, setLocalPhoto] = useState(null);
+  const [loadingImage, setLoadingImage] = useState(false);
   const { userData } = useUser();
+
+
+    useEffect(() => {
+  if (userData) {
+    setUsername(userData.displayName || '');
+    setAvatar(userData.profilePicture || null);
+  }
+}, [userData]);
+
+    const uploadImageToCloudinary = async (imageUri) => {
+    const data = new FormData();
+    data.append('file', {
+      uri: imageUri,
+      type: 'image/jpeg',
+      name: 'product.jpg',
+    });
+    data.append('upload_preset', 'pawpal_upload');
+
+    try {
+      console.log('Sending request to Cloudinary...');
+      const res = await fetch('https://api.cloudinary.com/v1_1/ddktpudii/image/upload', {
+        method: 'POST',
+        body: data,
+      });
+      
+      console.log('Cloudinary response status:', res.status);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log('Cloudinary error response:', errorText);
+        return null;
+      }
+      
+      const file = await res.json();
+      console.log('Cloudinary upload success:', file.secure_url);
+      return file.secure_url;
+    } catch (error) {
+      console.log('Cloudinary upload error:', error);
+      return null;
+    }
+  };
 
   const DATA = [
     { id: '1', title: 'Other' },
@@ -43,8 +90,10 @@ const CreateProduct = ({ navigation }) => {
   ];
 
   const pickImage = async () => {
+    console.log('pickImage function called');
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('Permission result:', permissionResult);
       if (!permissionResult.granted) {
         Alert.alert('Permission Required', 'Gallery permission is needed to select a photo.');
         return;
@@ -55,8 +104,25 @@ const CreateProduct = ({ navigation }) => {
         aspect: [1, 1],
         quality: 0.8,
       });
+      console.log('ImagePicker result:', result);
       if (!result.canceled && result.assets?.length > 0) {
-        setPhoto(result.assets[0].uri);
+        const localUri = result.assets[0].uri;
+        console.log('Selected image URI:', localUri);
+        console.log('Image asset details:', result.assets[0]);
+        setLocalPhoto(localUri); // Show immediately
+        setLoadingImage(true);
+
+        console.log('Starting Cloudinary upload for:', localUri);
+        const uploadedUrl = await uploadImageToCloudinary(localUri);
+        if (uploadedUrl) {
+          console.log('Upload successful, setting photo to:', uploadedUrl);
+          setPhoto(uploadedUrl);
+        } else {
+          console.log('Upload failed, showing error alert');
+          Alert.alert('Error', 'Failed to upload image to Cloudinary. Please try again.');
+          setLocalPhoto(null);
+        }
+        setLoadingImage(false);
       }
     } catch (error) {
       console.error('ImagePicker Error:', error);
@@ -88,11 +154,14 @@ const CreateProduct = ({ navigation }) => {
       },
     );
 
-  const deletePhoto = () => setPhoto(null);
+  const deletePhoto = () => {
+    setPhoto(null);
+    setLocalPhoto(null);
+  };
 
   const handleSubmit = async () => {
     try {
-      await axios.post('http://192.168.1.83:3000/api/v1/market/create-product-post', {
+      await axios.post(`${SERVER_CONFIG.API_BASE_URL}/market/create-product-post`, {
         productId: uuid.v4(),
         seller: userData?.uid,
         description: description,
@@ -139,100 +208,111 @@ const CreateProduct = ({ navigation }) => {
 
 return (
  <ImageBackground source={backgroundImage} style={styles.background} resizeMode="cover">
- 
-          <View style={styles.header}>
-            <Image
-              source={userData?.avatar ? { uri: userData.avatar } : backgroundImage}
-              style={styles.avatar}
-            />
-            <Text style={styles.username}>{userData?.displayName || 'User Name'}</Text>
+   <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}  // iOS — поднимает всё, Android — сжимает
+      keyboardVerticalOffset={90}  // подстройка, если есть header
+    > 
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        > 
+
+      <View style={styles.container}>
+            <View style={styles.header}>
+              <Image
+                  source={avatar ? { uri: avatar } : backgroundImage}
+                  style={styles.avatar}
+              />
+              <Text style={styles.username}>{username || 'User Name'}</Text>
+            </View>
+        
+        <View style={styles.containerRow}> 
+          <View style={styles.leftColumn}> 
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.imageWrapper}>
+                {localPhoto || photo ? (
+                  <Image source={{ uri: photo || localPhoto }} style={styles.image} />
+                ) : (
+                  <View style={styles.placeholder}>
+                    <Text style={styles.placeholderText}>No photo selected</Text>
+                  </View>
+                )}
+                
+                {loadingImage && (
+                  <View style={styles.loadingOverlay}>
+                    <Text style={styles.loadingText}>Uploading...</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+
+            <View style={styles.buttonRow}>
+               <View style={styles.buttonWrapper}> 
+                <Button 
+                  color='#FF6347'
+                  title="Delete"
+                  onPress={() => deletePhoto()}
+                />
+              </View>
+              <View style={styles.buttonWrapper}>
+                <Button
+                  color='#FF6347'
+                  title="Add"
+                  onPress={() => pickImage()}
+                />
+              </View>
+            </View>
           </View>
-        <View style={styles.container}>
-       <View style={styles.containerRow}> 
-  
-  <View style={styles.leftColumn}> 
 
-    <View style={styles.imageWrapper}>
-      {photo ? (
-        <Image source={{ uri: photo }} style={styles.image} />
-      ) : (
-        <View style={styles.placeholder}>
-          <Text style={styles.placeholderText}>No photo selected</Text>
-        </View>
-      )}
-    </View>
+          <View style={styles.rightColumn}>
+             <TextInput
+                style={[styles.input, {   }]}
+                placeholder="Title of your product"
+                placeholderTextColor="#888"
+                value={title}
+                onChangeText={text => {
+                  if (text.length <= 200) setTitle(text);
+                }}
+                multiline={false}
+                numberOfLines={1}
+            /> 
 
-    <View style={styles.buttonRow}>
-       <View style={styles.buttonWrapper}> 
-      <Button 
-        color="#d9534f"
-        title="Delete"
-        onPress={() => deletePhoto()}
-      />
-      </View>
-      <View style={styles.buttonWrapper}>
-      <Button
-        color="#d9534f"
-        title="Add"
-        onPress={() => pickImage()}
-      />
-      </View>
-       
-    </View>
-  </View>
-
-
-  <View style={styles.rightColumn}>
-     <TextInput
-        style={[styles.input, {   }]}
-              placeholder="Title of your product"
-              placeholderTextColor="#888"
-              value={title}
-              onChangeText={text => {
-                if (text.length <= 200) setTitle(text);
-              }}
-              multiline={false}
-          numberOfLines={1}
-          /> 
-
-    <TextInput
-       style={styles.input}
-      placeholder="Set your location"
-      placeholderTextColor="#888"
-      value={location}
-      onChangeText={text => {
-        if (text.length <= 200) setLocation(text);
-      }}
-      multiline={true}
-      numberOfLines={3}
-      
-    />
-       <TextInput
-             style={[styles.input, { }]}
-              placeholder="Set your price"
-              placeholderTextColor="#888"
-              value={price.toString()}
-              onChangeText={text => {
-                const number = Number(text);
-                if (!isNaN(number) && text.length <= 200) {
-                  setPrice(number);
-                }
-              }}
-              multiline={false}
-              keyboardType="numeric"
-            />
-
-         <View style={styles.textRow}>
-            <Text style={styles.text}> Free to a good home.</Text>
-            <SwitchProduct />
-            </View>    
-
-          </View>
-          </View>
-    
-           <View style={{   flexWrap: 'nowrap',  }}> 
             <TextInput
-              style={[styles.input, styles.inputMultiline, {  }]}
+               style={styles.input}
+              placeholder="Set your location"
+              placeholderTextColor="#888"
+              value={location}
+              onChangeText={text => {
+                if (text.length <= 200) setLocation(text);
+              }}
+              multiline={true}
+              numberOfLines={3}
+            />
+               <TextInput
+                     style={[styles.input, { }]}
+                      placeholder="Set your price"
+                      placeholderTextColor="#888"
+                      value={price.toString()}
+                      onChangeText={text => {
+                        const number = Number(text);
+                        if (!isNaN(number) && text.length <= 200) {
+                          setPrice(number);
+                        }
+                      }}
+                      multiline={false}
+                      keyboardType="numeric"
+                    />
+
+              
+          </View>
+        </View>
+    
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={ styles.containerText }> 
+            <TextInput
+              style={[ styles.inputMultiline, {  }]}
               placeholder="Tell about your product..."
               placeholderTextColor="#888"
               value={description}
@@ -242,13 +322,10 @@ return (
               multiline={true}
               numberOfLines={7}
             />
-            </View>
+          </View>
+        </TouchableWithoutFeedback>
              
-            
-             
-             
-
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap:5 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap:5 }}>
            {DATA.map((item) => (
            <Pressable
            key={item.id}
@@ -257,7 +334,7 @@ return (
                 setSelectedId(item.id);
               }}
               style={{
-               backgroundColor: item.id === selectedId ? "#d9534f" : '#ffffff',
+               backgroundColor: item.id === selectedId ?'#FF6347' : '#ffffff',
                padding: 12,
                borderRadius: 5,
                margin: 3,
@@ -270,28 +347,28 @@ return (
                </Text>
             </Pressable>
                     ))}
-          </View>
+        </View>
              
-             
-
-            <View style={styles.buttonSubmit}>
-              <Button
-                color="#d9534f"
-                title="Submit Product"
-                onPress={() => {
-                    if (!description || !location || !price || !category || !title) {
+        <View style={styles.buttonSubmit}>
+          <Button
+            color='#FF6347'
+            title="Submit Product"
+            onPress={() => {
+                if (!description || !location || !price || !category || !title) {
                    Alert.alert('Error', 'Please fill in all required fields');
                     return;
                     } else {
                   showAlertSave();
                     }
                  }}
-              />
-             </View>
-             
-
-          </View>
-         </ImageBackground>
+          />
+        </View>
+      
+      </View>
+              </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  </ImageBackground>
   );
 };
 
@@ -299,8 +376,33 @@ export default CreateProduct;
 
 const styles = StyleSheet.create({
  container: {
-    alignItems: 'right',
     padding: 12,
+     alignItems: 'right',
+    marginTop:30,
+    marginBottom: 40,
+    backgroundColor: '#ffffff',
+    borderRadius: 30,
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+
+  },
+   containerText: {
+     padding: 12,
+    marginTop: 20,
+    marginBottom: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    borderColor: '#FF6347',
+    borderWidth: 1,
+    multiline: true,
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    justifyContent: 'flex-start',  
+    alignItems:  'flex-start',      
   },
   containerRow: {
     flexDirection: 'row',
@@ -312,43 +414,45 @@ const styles = StyleSheet.create({
     buttonRow: {
     flexDirection: 'column',
     justifyContent: 'space-between',
-
     width:'100%',
-    
   },
   buttonWrapper: {
     flex: 1, 
-
   },
-
    rightColumn: {
     flex: 5,
-     
-   paddingLeft: 10,
+    paddingLeft: 10,
     justifyContent: 'top',
-    
   },
    leftColumn: {
      flex: 5,
-     
   },
- 
- 
+   bottomContainer: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 40,
+    backgroundColor: '#ffffff',
+    borderRadius: 30,
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+  },
   textRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-     
   } ,
   buttonRow: {
     flexDirection: 'row',
     gap: 3,
-     
-     justifyContent: 'right',
+    justifyContent: 'right',
   },
    deleteButton: {
-    backgroundColor: '#ff6b6b',
+    backgroundColor: '#FF6347',
   },
   addButton: {
     backgroundColor: '#0374b1ff',
@@ -368,10 +472,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
- 
   input: {
     backgroundColor: '#fff',
-    borderColor: '#ccc',
+    borderColor: '#ff6b6b',
     borderWidth: 1,
     borderRadius: 10,
     padding: 15,
@@ -420,16 +523,42 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-    
   },
-    
-   placeholder: {
+  placeholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
- placeholderText: {
+  placeholderText: {
     color: '#888',
     fontStyle: 'italic',
+  },
+  item: {
+    padding: 20,
+    marginVertical: 8,
+    marginHorizontal: 16,
+    borderRadius: 8,
+  },
+  title: {
+    fontSize: 16,
+  },
+  text: {
+    fontSize: 16,
+    color: '#333',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

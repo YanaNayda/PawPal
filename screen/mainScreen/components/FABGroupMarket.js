@@ -27,7 +27,7 @@ const FabGroupMarket = () => {
             {
               icon: 'account',
               label: 'My Products',
-             onPress: () => navigation.navigate('ProductScreen'),
+             onPress: () => navigation.navigate('MyProduct'),
             }
              
           ]}

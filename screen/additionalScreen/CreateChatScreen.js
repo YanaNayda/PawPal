@@ -11,24 +11,53 @@ import {
   SafeAreaView
 } from 'react-native';
 import { useUser } from '../../context/UserContext';
+import { useRoute } from '@react-navigation/native';
 import chatApiService from '../../services/chatApiService';
+import { SERVER_CONFIG } from '../../config/serverConfig.js';
 
 export default function CreateChatScreen({ navigation }) {
   const { userData } = useUser();
+  const route = useRoute();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [creatingChat, setCreatingChat] = useState(false);
+  const [autoCreateChat, setAutoCreateChat] = useState(false);
+
+  // Check for preSelectedUsers from route params
+  const preSelectedUsers = route?.params?.preSelectedUsers;
 
   useEffect(() => {
     loadAllUsers();
   }, []);
 
+  // Handle preSelectedUsers
+  useEffect(() => {
+    if (preSelectedUsers && preSelectedUsers.length > 0) {
+      // Find the user objects for the preSelectedUsers UIDs
+      const selectedUserObjects = users.filter(user => 
+        preSelectedUsers.includes(user.uid)
+      );
+      
+      if (selectedUserObjects.length > 0) {
+        setSelectedUsers(selectedUserObjects);
+        setAutoCreateChat(true);
+      }
+    }
+  }, [preSelectedUsers, users]);
+
+  // Auto-create chat when preSelectedUsers are provided
+  useEffect(() => {
+    if (autoCreateChat && selectedUsers.length > 0 && !creatingChat) {
+      createChat();
+    }
+  }, [selectedUsers, autoCreateChat]);
+
   const loadAllUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.1.83:3000/api/v1/users/all`);
+      const response = await fetch(`${SERVER_CONFIG.API_BASE_URL}/users/all`);
       const data = await response.json();
       
       // Filter out the current user
@@ -72,18 +101,24 @@ export default function CreateChatScreen({ navigation }) {
         
         console.log('CreateChatScreen: 1-on-1 chat created successfully:', response);
 
-        Alert.alert(
-          'Chat Created!', 
-          `Started a chat with ${selectedUser.displayName}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.navigate('Chat', { refresh: true });
+        if (autoCreateChat) {
+          // Auto-created chat - navigate directly to chat
+          navigation.navigate('Chat', { refresh: true });
+        } else {
+          // Manual creation - show alert
+          Alert.alert(
+            'Chat Created!', 
+            `Started a chat with ${selectedUser.displayName}`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.navigate('Chat', { refresh: true });
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        }
       } else {
         // Create group chat
         const userIds = [userData.uid, ...selectedUsers.map(user => user.uid)];
@@ -93,18 +128,24 @@ export default function CreateChatScreen({ navigation }) {
         
         console.log('CreateChatScreen: Group chat created successfully:', response);
 
-        Alert.alert(
-          'Group Chat Created!', 
-          `Started a group chat with ${selectedUsers.length} other members`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.navigate('Chat', { refresh: true });
+        if (autoCreateChat) {
+          // Auto-created chat - navigate directly to chat
+          navigation.navigate('Chat', { refresh: true });
+        } else {
+          // Manual creation - show alert
+          Alert.alert(
+            'Group Chat Created!', 
+            `Started a group chat with ${selectedUsers.length} other members`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.navigate('Chat', { refresh: true });
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        }
       }
     } catch (error) {
       console.error('Error creating chat:', error);
@@ -153,59 +194,72 @@ export default function CreateChatScreen({ navigation }) {
     );
   }
 
+  if (autoCreateChat && creatingChat) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6347" />
+        <Text style={styles.loadingText}>Creating chat...</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Start New Chat</Text>
-        <Text style={styles.subtitle}>
-          Select one or more users to start a conversation
-        </Text>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search users..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor="#999"
-        />
-      </View>
-
-      <FlatList
-        data={filteredUsers}
-        renderItem={renderUser}
-        keyExtractor={(item) => item.uid}
-        style={styles.usersList}
-        showsVerticalScrollIndicator={false}
-      />
-
-      <View style={styles.footer}>
-        <Text style={styles.selectedCount}>
-          {selectedUsers.length === 0 
-            ? 'Select users to start chatting' 
-            : selectedUsers.length === 1
-            ? `Selected: ${selectedUsers[0]?.displayName}`
-            : `Selected: ${selectedUsers.length} users`
-          }
-        </Text>
-        <TouchableOpacity
-          style={[
-            styles.createButton,
-            selectedUsers.length === 0 && styles.createButtonDisabled
-          ]}
-          onPress={createChat}
-          disabled={selectedUsers.length === 0 || creatingChat}
-        >
-          {creatingChat ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <Text style={styles.createButtonText}>
-              {selectedUsers.length === 1 ? 'Start Chat' : 'Create Group Chat'}
+      {!autoCreateChat && (
+        <>
+          <View style={styles.header}>
+            <Text style={styles.title}>Start New Chat</Text>
+            <Text style={styles.subtitle}>
+              Select one or more users to start a conversation
             </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          </View>
+
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search users..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <FlatList
+            data={filteredUsers}
+            renderItem={renderUser}
+            keyExtractor={(item) => item.uid}
+            style={styles.usersList}
+            showsVerticalScrollIndicator={false}
+          />
+
+          <View style={styles.footer}>
+            <Text style={styles.selectedCount}>
+              {selectedUsers.length === 0 
+                ? 'Select users to start chatting' 
+                : selectedUsers.length === 1
+                ? `Selected: ${selectedUsers[0]?.displayName}`
+                : `Selected: ${selectedUsers.length} users`
+              }
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.createButton,
+                selectedUsers.length === 0 && styles.createButtonDisabled
+              ]}
+              onPress={createChat}
+              disabled={selectedUsers.length === 0 || creatingChat}
+            >
+              {creatingChat ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.createButtonText}>
+                  {selectedUsers.length === 1 ? 'Start Chat' : 'Create Group Chat'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }

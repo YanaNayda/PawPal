@@ -2,73 +2,143 @@ import React, { useEffect, useState } from 'react';
 import {View,Text,StyleSheet,ImageBackground,Image,TouchableOpacity,TextInput,ScrollView, Button,} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useUser } from '../../context/UserContext';
-
-
+import { SERVER_CONFIG } from '../../config/serverConfig.js';
+import axios from 'axios';
  
  
 const EditProfile = ({navigation }) => {
     const { userData } = useUser();
 
   const [avatar, setAvatar] = useState(null);
+  const [localAvatar, setLocalAvatar] = useState(null);
+  const [loadingImage, setLoadingImage] = useState(false);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-
+ 
   useEffect(() => {
     if (userData) {
       setUsername(userData.displayName || '');
       setBio(userData.bio || '');
-      setAvatar(userData.photoURL || null);
+      setAvatar(userData.profilePicture || null);
       setEmail(userData.email || '');
       setPhoneNumber(userData.phoneNumber || '');
     }
   }, [userData]);
 
-   
-      const pickImage = async () => {
-        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (permissionResult.granted === false) {
-          alert("Permission to access camera roll is required!");
-          return;
-        }
-    
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 1,
-        });
-     
-        if (!result.canceled) {
-          setAvatar(result.assets[0].uri);
-        }
-          await axios.put(`http://192.168.1.83:3000/api/v1/users/${userData.uid}`, {
-         photoURL: result.assets[0].uri,
-            
-        });
-    
-      }; 
+  const uploadImageToCloudinary = async (imageUri) => {
+  const data = new FormData();
+  data.append('file', {
+    uri: imageUri,
+    type: 'image/jpeg',  
+    name: 'upload.jpg',
+  });
+  data.append('upload_preset', 'pawpal_upload');
+
+  try {
+    const res = await fetch('https://api.cloudinary.com/v1_1/ddktpudii/image/upload', {
+      method: 'POST',
+      body: data,
+    });
+
+    const file = await res.json();
+    return file.secure_url;   
+  } catch (error) {
+    console.log('Cloudinary upload error:', error);
+    return null;
+  }
+};
+
+  const pickImage = async () => {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    alert("Permission to access media library is required!");
+    return;
+  }
+
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    console.log("ImagePicker result:", result);  
+    if (!result.canceled && result.assets?.length > 0) {
+      const localUri = result.assets[0].uri;
+      setLocalAvatar(localUri); // Show immediately
+      setLoadingImage(true);
+
+      const uploadedUrl = await uploadImageToCloudinary(localUri);
+      if (uploadedUrl) {
+        setAvatar(uploadedUrl);
+      } else {
+        alert('Error uploading image');
+        setLocalAvatar(null);
+      }
+      setLoadingImage(false);
+    }
+  } catch (error) {
+    console.error("Error picking image:", error);
+    alert("Could not open gallery");
+  }
+};
+
+    const saveChanges = async () => {
+        try {
+    const res = await axios.put(
+      `http://${SERVER_CONFIG.SERVER_IP}:${SERVER_CONFIG.SERVER_PORT}/api/v1/users/${userData.uid}`,
+      {
+        displayName: username,
+        bio: bio,
+        email: email,
+        phoneNumber: phoneNumber,
+        profilePicture: avatar,
+      }
+    );
+
+    alert("Profile updated successfully!");
+    navigation.navigate('Main', {
+      screen: 'MainTabs',
+      params: { screen: 'Home' },
+    });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    alert("Failed to update profile");
+  }
+     };
+
 
   return (
     <ImageBackground
-      source={require('../../assets/back_add2png.png')}
+      source={require('../../assets/back_paws.png')}
       style={styles.background}
-      resizeMode="cover">
-
+      resizeMode="cover"
+    >
       <ScrollView contentContainerStyle={styles.container}>
 
-     <View style={styles.imageWrapper}>
+
+      <View style={ styles.bottomContainer} >
+      <View style={styles.imageWrapper}>
             <Image
-               source={avatar ? { uri: avatar } : require('../../assets/avatar_paw_pal.png')}
-               style={styles.image}
-             />
+              source={
+                  localAvatar ? { uri: localAvatar } : avatar ? { uri: avatar } : require('../../assets/avatar_paw_pal.png')}
+              style={styles.image}/>
+
              <TouchableOpacity style={styles.iconOverlay} onPress={pickImage}>
                <Image
                  source={require('../../assets/icon_camera.png')}  
                  style={styles.icon}
                />
              </TouchableOpacity>
+             
+             {loadingImage && (
+               <View style={styles.loadingOverlay}>
+                 <Text style={styles.loadingText}>Uploading...</Text>
+               </View>
+             )}
      </View> 
         
          <View style={{ width: '100%',color: '#ffffff', }}>
@@ -117,19 +187,16 @@ const EditProfile = ({navigation }) => {
           keyboardType="phone-pad"
         />
 
-        <Button 
-            style={styles.button}
-            title="Save Change"
-            onPress={() => navigation.navigate('Main', {
-                    screen: 'MainTabs',
-                    params: {
-                      screen: 'Home'
-                    },
-                  })
-              }
-        />
-      
+         <View style={styles.buttonContainer}>
+                  <Button
+                    title="Save "
+                    color="#FF6347"
+                     onPress= {saveChanges}
+                  />
+         </View>
+      </View>
       </ScrollView>
+   
     </ImageBackground>
   );
 };
@@ -140,15 +207,37 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
   },
+  bottomContainer: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 40,
+    backgroundColor: '#ffffff',
+    borderRadius: 30,
+    paddingVertical: 25,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+  },
+
   container: {
     alignItems: 'center',
     paddingTop: 50,
+    paddingHorizontal: 20,
     paddingBottom: 100,
+  },
+    buttonContainer: {
+    marginTop: 10,
+    backgroundColor: "#FF6347",
+    padding: 15,
+    borderRadius: 5,
+    width: "60%",
   },
   imageWrapper: {
     width: 150,
     height: 150,
-    borderRadius: 75,
+    borderRadius: 15,
     overflow: 'hidden',
     position: 'relative',
     marginBottom: 20,
@@ -173,6 +262,8 @@ const styles = StyleSheet.create({
   input: {
     width: '90%',
     backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#FF6347',
     borderRadius: 10,
     padding: 15,
     fontSize: 16,
@@ -222,7 +313,7 @@ const styles = StyleSheet.create({
   questionText: {
   fontSize: 10,
   fontWeight: 'bold',
-  color: '#333',
+  color: '#303030ff',
   marginBottom: 5,
   marginStart:25,
   textAlign: 'left',  
@@ -241,6 +332,22 @@ button: {
   shadowOpacity: 0.2,
   shadowRadius: 4,
   elevation: 3,
+},
+loadingOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderRadius: 75,
+},
+loadingText: {
+  color: 'white',
+  fontSize: 14,
+  fontWeight: 'bold',
 },
 
 });
